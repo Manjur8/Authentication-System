@@ -3,6 +3,10 @@ const connectDB = require('./config/db');
 // const router = express.Router();
 // const User = require('../models/user');
 
+// ===Import routes===
+const authRoutes = require('./routes/auth');
+const profileRoutes = require('./routes/profile');
+
 const app = express();
 app.use(express.json());
 
@@ -11,6 +15,10 @@ connectDB();
 app.get('/', (req, res) => {
     res.json({data: 'User API is running'}, {status: 200});
 })
+
+app.use('/api/auth', authRoutes);
+
+app.use('/api/profile', profileRoutes); 
 
 const PORT = process.env.PORT || 5000;
 
