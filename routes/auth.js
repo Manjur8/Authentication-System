@@ -2,6 +2,8 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/user');
+const RefreshToken = require('../models/refreshToken');
+const { createJti, signAccessToken, signRefreshToken, persistRefreshToken, setRefreshCookie, hashToken, rotateRefreshToken } = require('../utils/tokens');
 
 const router = express.Router();
 
@@ -35,14 +37,69 @@ router.post('/login', async (req, res) => {
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(400).json({ message: 'Invalid credentials' });
 
-    const payload = { id: user._id, email: user.email };
+    // ==== refresh token logic ====
+    const jti = createJti();
+    const accessToken = signAccessToken(user);
+    const refreshToken = signRefreshToken(user, jti);
 
-    const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '15m' });
+    await persistRefreshToken({
+      user,
+      refreshToken,
+      jti,
+      ip: req.ip,
+      userAgent: req.headers['user-agent'] || ''
+    });
 
-    res.json({ token });
+    setRefreshCookie(res, refreshToken);
+    // ============================
+
+    res.json({ accessToken });
+
+    // const payload = { id: user._id, email: user.email };
+
+    // const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '15m' });
+
+    // res.json({ token });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
   }
 });
+
+router.post('/refresh', async (req, res) => {
+  try {
+    const token = req.cookies?.refresh_token;
+    if (!token) {
+      return res.status(401).json({ message: 'Missing refresfdh token' });
+    }
+  
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.REFRESH_TOKEN_SECRET);
+    } catch (err) {
+      return res.status(401).json({ message: 'Invalid refresh token' });
+    }
+  
+    const tokenHash = hashToken(token);
+    const doc = await RefreshToken.findOne({ jti: decoded.jti, tokenHash }).populate('user');
+  
+    if(!doc) {
+      return res.status(401).json({ message: 'Refresh token not found' });
+    }
+  
+    if(doc.revokedAt) {
+      return res.status(401).json({ message: 'Refresh token revoked' });
+    }
+  
+    if(doc.expiresAt < new Date()) {
+      return res.status(401).json({ message: 'Refresh token expired' });
+    }
+  
+    const result = await rotateRefreshToken(doc, doc.user, req, res);
+    console.log("Token refreshed for user: ", doc.user.email);
+    return res.json({ accessToken: result.accessToken });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+})
 
 module.exports = router;

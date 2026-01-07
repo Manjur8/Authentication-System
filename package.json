@@ -12,6 +12,7 @@
   "dependencies": {
     "@dotenvx/dotenvx": "^1.51.1",
     "bcryptjs": "^3.0.3",
+    "cookie-parser": "^1.4.7",
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^9.0.0"

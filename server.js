@@ -1,5 +1,6 @@
 const express = require('express');
 const connectDB = require('./config/db');
+const cookieParser = require('cookie-parser');
 // const router = express.Router();
 // const User = require('../models/user');
 
@@ -9,6 +10,7 @@ const profileRoutes = require('./routes/profile');
 
 const app = express();
 app.use(express.json());
+app.use(cookieParser());
 
 connectDB();
 
