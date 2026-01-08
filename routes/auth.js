@@ -69,7 +69,7 @@ router.post('/refresh', async (req, res) => {
   try {
     const token = req.cookies?.refresh_token;
     if (!token) {
-      return res.status(401).json({ message: 'Missing refresfdh token' });
+      return res.status(401).json({ message: 'Missing refresh token' });
     }
   
     let decoded;
@@ -95,11 +95,28 @@ router.post('/refresh', async (req, res) => {
     }
   
     const result = await rotateRefreshToken(doc, doc.user, req, res);
-    console.log("Token refreshed for user: ", doc.user.email);
     return res.json({ accessToken: result.accessToken });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
   }
 })
+
+router.post('/logout', async (req, res) => {
+  try {
+    const token = req.cookies?.refresh_token;
+    if (token) {
+      const tokenHash = hashToken(token);
+      const doc = await RefreshToken.findOne({ tokenHash });
+      if (doc && !doc.revokedAt) {
+        doc.revokedAt = new Date();
+        await doc.save();
+      }
+    }
+    res.clearCookie('refresh_token', { path: '/api/auth/refresh' });
+    res.json({ message: 'Logged out' });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
 
 module.exports = router;
